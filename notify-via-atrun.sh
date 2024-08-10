@@ -2,6 +2,7 @@
 
 function __notify_usage {
     cat <<EOF
+Create Python Process to Notify Specific Message
 Usage:
     notify [<Time to notify(hh:mm)>] [<Title of notice>] [<Message of notice>]
     notify [<option>...]
@@ -13,9 +14,6 @@ EOF
 
 
 function notify {
-
-    # 定義類
-    TEMP_FILENAME="./.temp-atrun-notice.script"
 
     # 引数取得
     run_time=$1
@@ -39,15 +37,9 @@ function notify {
         return 1
     fi
 
-
-    # 通知文作成してAppleScriptの中間ファイル作成
-    echo "display notification \"${message}\" with title \"${title}\"" > ${TEMP_FILENAME}
-    
     # atdに渡して通知設定
-    echo "osascript ${TEMP_FILENAME}" | at $run_time
-    osascript ${TEMP_FILENAME}
-
-    # 中間ファイルを削除
-    rm -f $TEMP_FILENAME
+    # echo "osascript -e 'display notification \"${message}\" with title \"${title}\"'" | at ${run_time}
+    python ${SCRIPT_DIR}/python-sources/atrun-config.py --runtime ${run_time} --title ${title} --message ${message}
+    nohup python ${SCRIPT_DIR}/python-sources/wait-and-notice.py >/dev/null 2>&1 &
     
 }
