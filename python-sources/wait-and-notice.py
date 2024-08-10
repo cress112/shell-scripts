@@ -56,5 +56,5 @@ if __name__=="__main__":
     # 環境変数取得
     SOURCEPATH = os.environ["SCRIPT_DIR"]
     
-    config = readjson(SOURCEPATH + '/python-sources/.atrun-config.json')
+    config = readjson(SOURCEPATH + '/python-sources/.notice-config.json')
     run(config)

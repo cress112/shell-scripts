@@ -51,4 +51,4 @@ if __name__=='__main__':
 
     # オプション引数を処理
     Parser = DlConfig()
-    Parser.setConfig(SOURCEPATH + '/python-sources/.atrun-config.json')
+    Parser.setConfig(SOURCEPATH + '/python-sources/.notice-config.json')
