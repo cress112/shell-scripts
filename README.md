@@ -32,4 +32,4 @@
     ```
 
 # 詳説
-- [`notify-via-python.sh`](./notify-via-python.md)
+- [`notify-via-python.sh`](./Docs/notify-via-python.md)
