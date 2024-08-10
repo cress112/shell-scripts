@@ -30,3 +30,6 @@
     ```bash
     $ source ~/.bashrc
     ```
+
+# 詳説
+- [`notify-via-python.sh`](./notify-via-python.md)
