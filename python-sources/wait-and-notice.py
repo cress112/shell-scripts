@@ -25,7 +25,7 @@ def get_diff_sec(hhmm_target: str) -> int:
     target_date = datetime.datetime.strptime(hhmm_target, '%H:%M')
     return (target_date - now_date).seconds
 
-def notify(title: str, message: str) -> None:
+def notify(runtime: str, title: str, message: str) -> None:
     """
     osascriptを使って通知を行う
     Args:
@@ -34,7 +34,7 @@ def notify(title: str, message: str) -> None:
     Attributes:
         None
     """
-    notice_arg = f"display notification \"{message}\" with title \"{title}\""
+    notice_arg = f"display notification \"[{runtime}] {message}\" with title \"{title}\""
     subprocess.run(["osascript", "-e", notice_arg])
 
 def run(config: dict) -> None:
@@ -47,7 +47,7 @@ def run(config: dict) -> None:
     """
     diff_sec = get_diff_sec(config["runtime"])
     time.sleep(diff_sec)
-    notify(config["title"], config["message"])
+    notify(config["runtime"], config["title"], config["message"])
 
 ### ================================================
 ### MAIN
