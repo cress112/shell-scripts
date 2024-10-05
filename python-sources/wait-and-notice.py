@@ -46,7 +46,7 @@ def run(config: dict) -> None:
         None
     """
     diff_sec = get_diff_sec(config["runtime"])
-    if (diff_sec < 0 or diff_sec>=1440):
+    if (diff_sec < 0 or diff_sec>=86400):
         raise ValueError("指定できる時刻は本日中のみです。")
     time.sleep(diff_sec)
     notify(config["runtime"], config["title"], config["message"])
