@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 
+YT_DIR="${SCRIPT_DIR}/yt-dlp"
+
 function ytu {
     current_dir=$(pwd)
-    
-    cd ~/Downloads/other_programs/20240810_shell-scripts/yt-dlp || exit
+
+    cd "${YT_DIR}" || exit
     git pull
 
     cd "${current_dir}" || exit
-
 }
