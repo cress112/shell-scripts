@@ -1,0 +1,21 @@
+export PATH="/usr/local/opt/tcl-tk/bin:$PATH"
+export PATH="/usr/local/opt/icu4c/bin:$PATH"
+export PATH="/usr/local/opt/icu4c@76/bin:$PATH"
+export PATH="/usr/local/opt/icu4c@76/sbin:$PATH"
+export LDFLAGS="-L/usr/local/opt/zlib/lib:$LDFLAGS"
+export LDFLAGS="-L/usr/local/opt/bzip2/lib:$LDFLAGS"
+export LDFLAGS="-L/usr/local/opt/icu4c@76/lib:$LDFLAGS"
+export CPPFLAGS="-I/usr/local/opt/zlib/include:$CPPFLAGS"
+export CPPFLAGS="-I/usr/local/opt/tcl-tk/include:$CPPFLAGS"
+export CPPFLAGS="-I/usr/local/opt/bzip2/include:$CPPFLAGS"
+export CPPFLAGS="-I/usr/local/opt/icu4c@76/include:$CPPFLAGS"
+export PKG_CONFIG_PATH="/usr/local/opt/zlib/lib/pkgconfig:$PKG_CONFIG_PATH"
+export PKG_CONFIG_PATH="/usr/local/opt/tcl-tk/lib/pkgconfig:$PKG_CONFIG_PATH"
+export PKG_CONFIG_PATH="/usr/local/opt/icu4c@76/lib/pkgconfig:$PKG_CONFIG_PATH"
+# export PYTHON_CONFIGURE_OPTS="--with-tcltk-includes='-I/usr/local/opt/tcl-tk/include' --with-tcltk-libs='-L/usr/local/opt/tcl-tk/lib -ltcl8.6 -ltk8.6'"
+export CPLUS_INCLUDE_PATH="/usr/local/include"
+export LIBRARY_PATH="/usr/local/include"
+export CPATH="/usr/local/include"
+
+# asdfのセッティング
+. /usr/local/opt/asdf/libexec/asdf.sh

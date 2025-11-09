@@ -6,25 +6,18 @@
 # 環境構築
 - ソースをclone & cd
     ```bash
-    $ git clone https://github.com/cress112/shell-scripts.git
-    $ cd shell-scripts
+    git clone https://github.com/cress112/shell-scripts.git
+    cd shell-scripts
+    pwd
     ```
 - `~/.bashrc`に以下の記述を追加
-    ```bash
-    $ vi ~/.bashrc
-        .
-        .
-        .
-    export SCRIPT_DIR=~/documents/bash-scripts
-    scripts=($(ls ${SCRIPT_DIR} | grep .sh))
-    for script in ${scripts[@]}; do
+    ```sh
+    export SCRIPT_DIR=<このソースディレクトリの絶対パス>
+
+    scripts=($(ls "${SCRIPT_DIR}" | grep '\.sh'))
+    for script in "${scripts[@]}"; do
         source "${SCRIPT_DIR}/${script}"
     done
-    ```
-    - ソースプログラムで`SCRIPT_DIR`を参照しているため, `export`している
-- シンボリックリンクを作成
-    ```bash
-    $ ln -s `pwd` ~/documents/bash-scripts
     ```
 - `bashrc`読み込み
     ```bash
@@ -32,4 +25,4 @@
     ```
 
 # 詳説
-- [`notify-via-python.sh`](./Docs/notify-via-python.md)
+- [`notify.sh`](./Docs/notify.md)

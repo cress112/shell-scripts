@@ -41,5 +41,5 @@ function notify {
     # echo "osascript -e 'display notification \"${message}\" with title \"${title}\"'" | at ${run_time}
     python ${SCRIPT_DIR}/python-sources/notice-config.py --runtime ${run_time} --title ${title} --message ${message}
     nohup python ${SCRIPT_DIR}/python-sources/wait-and-notice.py >/dev/null 2>&1 &
-    
+
 }

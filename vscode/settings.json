@@ -1,0 +1,155 @@
+{
+    "[python]": {
+        "editor.formatOnType": true
+    },
+    "editor.accessibilitySupport": "off",
+    "editor.minimap.enabled": false,
+    "editor.unicodeHighlight.ambiguousCharacters": false,
+    "files.autoGuessEncoding": true,
+    "files.readonlyInclude": {
+        "**/.cargo/git/checkouts/**/*.rs": true,
+        "**/.cargo/registry/src/**/*.rs": true,
+        "**/lib/rustlib/src/rust/library/**/*.rs": true
+    },
+    "git.suggestSmartCommit": false,
+    "hediet.vscode-drawio.resizeImages": null,
+    "latex-workshop.latex.tools": [
+        {
+            "args": [
+                "-e",
+                "$latex=q/uplatex %O -synctex=1 -interaction=nonstopmode -file-line-error %S/",
+                "-e",
+                "$bibtex=q/upbibtex %O %B/",
+                "-e",
+                "$biber=q/biber %O --bblencoding=utf8 -u -U --output_safechars %B/",
+                "-e",
+                "$makeindex=q/upmendex %O -o %D %S/",
+                "-e",
+                "$dvipdf=q/dvipdfmx %O -o %D %S/",
+                "-norc",
+                "-gg",
+                "-pdfdvi",
+                "%DOC%"
+            ],
+            "command": "latexmk",
+            "env": {},
+            "name": "latexmk"
+        },
+        {
+            "args": [
+                "-synctex=1",
+                "-interaction=nonstopmode",
+                "-file-line-error",
+                "-lualatex",
+                "-outdir=%OUTDIR%",
+                "%DOC%"
+            ],
+            "command": "latexmk",
+            "env": {},
+            "name": "lualatexmk"
+        },
+        {
+            "args": [
+                "-synctex=1",
+                "-interaction=nonstopmode",
+                "-file-line-error",
+                "-xelatex",
+                "-outdir=%OUTDIR%",
+                "%DOC%"
+            ],
+            "command": "latexmk",
+            "env": {},
+            "name": "xelatexmk"
+        },
+        {
+            "args": [
+                "%DOC%"
+            ],
+            "command": "latexmk",
+            "env": {},
+            "name": "latexmk_rconly"
+        },
+        {
+            "args": [
+                "-synctex=1",
+                "-interaction=nonstopmode",
+                "-file-line-error",
+                "%DOC%"
+            ],
+            "command": "pdflatex",
+            "env": {},
+            "name": "pdflatex"
+        },
+        {
+            "args": [
+                "%DOCFILE%"
+            ],
+            "command": "bibtex",
+            "env": {},
+            "name": "bibtex"
+        },
+        {
+            "args": [
+                "-e",
+                "knitr::opts_knit$set(concordance = TRUE); knitr::knit('%DOCFILE_EXT%')"
+            ],
+            "command": "Rscript",
+            "env": {},
+            "name": "rnw2tex"
+        },
+        {
+            "args": [
+                "-e",
+                "using Weave; weave(\"%DOC_EXT%\", doctype=\"tex\")"
+            ],
+            "command": "julia",
+            "env": {},
+            "name": "jnw2tex"
+        },
+        {
+            "args": [
+                "-e",
+                "using Weave; weave(\"%DOC_EXT%\", doctype=\"texminted\")"
+            ],
+            "command": "julia",
+            "env": {},
+            "name": "jnw2texminted"
+        },
+        {
+            "args": [
+                "-f",
+                "tex",
+                "%DOC_EXT%"
+            ],
+            "command": "pweave",
+            "env": {},
+            "name": "pnw2tex"
+        },
+        {
+            "args": [
+                "-f",
+                "texminted",
+                "%DOC_EXT%"
+            ],
+            "command": "pweave",
+            "env": {},
+            "name": "pnw2texminted"
+        },
+        {
+            "args": [
+                "--synctex",
+                "--keep-logs",
+                "%DOC%.tex"
+            ],
+            "command": "tectonic",
+            "env": {},
+            "name": "tectonic"
+        }
+    ],
+    "rust-analyzer.restartServerOnConfigChange": true,
+    "security.workspace.trust.enabled": false,
+    "security.workspace.trust.untrustedFiles": "open",
+    "trailing-spaces.trimOnSave": true,
+    "window.zoomLevel": -1,
+    "workbench.colorTheme": "Monokai Dimmed"
+}
