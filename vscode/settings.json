@@ -5,6 +5,7 @@
     "editor.accessibilitySupport": "off",
     "editor.minimap.enabled": false,
     "editor.unicodeHighlight.ambiguousCharacters": false,
+    "explorer.sortOrder": "type",
     "files.autoGuessEncoding": true,
     "files.readonlyInclude": {
         "**/.cargo/git/checkouts/**/*.rs": true,
@@ -12,6 +13,12 @@
         "**/lib/rustlib/src/rust/library/**/*.rs": true
     },
     "git.suggestSmartCommit": false,
+    "github.copilot.enable": {
+        "*": false,
+        "markdown": false,
+        "plaintext": false,
+        "scminput": false
+    },
     "hediet.vscode-drawio.resizeImages": null,
     "latex-workshop.latex.tools": [
         {
