@@ -12,6 +12,8 @@ function freeze-asdf() {
     function __list_versions() {
         if [ ! -d "$PLUGIN_LIST_DIR" ]; then
             mkdir -p "$PLUGIN_LIST_DIR"
+        else
+            rm -f "${PLUGIN_LIST_DIR}"/*
         fi
         while read -r plugin_name; do
             __list_version "$plugin_name" > "${PLUGIN_LIST_DIR}/${plugin_name}.${FILE_EXTENSION}"
