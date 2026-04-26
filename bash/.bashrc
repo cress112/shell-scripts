@@ -17,5 +17,8 @@ export CPLUS_INCLUDE_PATH="/usr/local/include"
 export LIBRARY_PATH="/usr/local/include"
 export CPATH="/usr/local/include"
 
+export CUSTOM_BIN_PATH="/usr/local/opt/custom_bin"
+export PATH="$CUSTOM_BIN_PATH:$PATH"
+
 # asdfのセッティング
 . /usr/local/opt/asdf/libexec/asdf.sh

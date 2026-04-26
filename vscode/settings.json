@@ -158,5 +158,6 @@
     "security.workspace.trust.untrustedFiles": "open",
     "trailing-spaces.trimOnSave": true,
     "window.zoomLevel": -1,
-    "workbench.colorTheme": "Monokai Dimmed"
+    "workbench.colorTheme": "Monokai Dimmed",
+    "explorer.compactFolders": false
 }
