@@ -5,7 +5,7 @@ function cdp() {
     target_dir="/"
     while [ "${target_dir}" != "." ];
     do
-        target_dir=$(ls -la | grep -e ^d -e ^l | peco | awk '{print $9}')
+        target_dir=$(echo -e ".\n..\n$(find . -type d -mindepth 1 -maxdepth 1)" | peco --prompt "$(pwd)/ to ...:")
         if [ -z "${target_dir}" ]; then
             cd "${current_dir}" || exit
             return 1
