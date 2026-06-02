@@ -1,0 +1,35 @@
+{
+  "notes": {
+    "permission_mode_values": [
+      "default",
+      "acceptEdits",
+      "plan",
+      "dontAsk",
+      "bypassPermissions"
+    ],
+    "current_ui_mapping_guess": {
+      "Default": "default",
+      "Auto-review": "default",
+      "Full Access": "bypassPermissions"
+    }
+  },
+  "options": {
+    "reject_if_contains_shell_metacharacters": true
+  },
+  "bash": {
+    "deny_prefixes": [
+      "rm -rf",
+      "sudo",
+      "git push --force"
+    ],
+    "allow_by_mode": {
+      "bypassPermissions": [
+        "curl",
+        "cat",
+        "echo",
+        "head",
+        "tail"
+      ]
+    }
+  }
+}

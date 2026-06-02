@@ -1,0 +1,27 @@
+# Auto-allow fixed read-only git inspection commands outside the sandbox.
+prefix_rule(
+    pattern = ["git", "status"],
+    decision = "allow",
+    justification = "Read-only repository status is allowed.",
+    match = [
+        "git status",
+        "git status --short",
+    ],
+    not_match = [
+        "git stash",
+    ],
+)
+
+prefix_rule(
+    pattern = ["git", "diff"],
+    decision = "allow",
+    justification = "Read-only diffs are allowed.",
+    match = [
+        "git diff",
+        "git diff --stat",
+        "git diff HEAD~1",
+    ],
+    not_match = [
+        "git difftool",
+    ],
+)

@@ -7,7 +7,7 @@ YT_DOWNLOAD_DIR="${HOME}/Downloads"
 ### pip install pycryptodomex
 
 function yt {
-    "${YT_DIR}"/yt-dlp.sh "$@"
+    "${YT_DIR}/yt-dlp.sh" "$@"
 }
 
 function yt-list {
@@ -15,11 +15,11 @@ function yt-list {
 }
 
 function yt-dl {
-    yt --output "${YT_DOWNLOAD_DIR}"/'%(upload_date)s_%(title)s.%(ext)s' --write-thumbnail "$@"
+    yt --output "${YT_DOWNLOAD_DIR}/%(upload_date)s_%(title)s.%(ext)s" --write-thumbnail "$@"
 }
 
 function ytjs {
-    "${YT_DIR}"/yt-dlp.sh --js-runtimes node:$(which node) --remote-components ejs:github "$@"
+    "${YT_DIR}/yt-dlp.sh" --js-runtimes node:$(which node) --remote-components ejs:github "$@"
 }
 
 function ytjs-list {

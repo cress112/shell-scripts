@@ -1,0 +1,87 @@
+model = "gpt-5.4"
+model_reasoning_effort = "high"
+approvals_reviewer = "user"
+model_context_window = 1000000
+model_auto_compact_token_limit = 500000
+
+[marketplaces.openai-bundled]
+last_updated = "2026-05-31T09:50:24Z"
+source_type = "local"
+source = "/Users/maedacresson/Downloads/other_programs/20240810_shell-scripts/codex/.tmp/bundled-marketplaces/openai-bundled"
+
+[marketplaces.openai-primary-runtime]
+last_updated = "2026-05-31T09:53:18Z"
+source_type = "local"
+source = "/Users/maedacresson/.cache/codex-runtimes/codex-primary-runtime/plugins/openai-primary-runtime"
+
+[plugins."browser@openai-bundled"]
+enabled = true
+
+[plugins."documents@openai-primary-runtime"]
+enabled = true
+
+[plugins."spreadsheets@openai-primary-runtime"]
+enabled = true
+
+[plugins."presentations@openai-primary-runtime"]
+enabled = true
+
+[features]
+js_repl = false
+memories = true
+
+[mcp_servers.node_repl]
+command = "/Applications/Codex.app/Contents/Resources/node_repl"
+startup_timeout_sec = 120.0
+
+[mcp_servers.node_repl.env]
+BROWSER_USE_AVAILABLE_BACKENDS = "chrome,iab"
+BROWSER_USE_CODEX_APP_BUILD_FLAVOR = "prod"
+CODEX_CLI_PATH = "/Applications/Codex.app/Contents/Resources/codex"
+CODEX_HOME = "/Users/maedacresson/.codex"
+NODE_REPL_INSTRUCTIONS_USE_CASE_BROWSER = "Control the in-app browser in conjunction with the Browser Plugin."
+NODE_REPL_INSTRUCTIONS_USE_CASE_CHROME = "Control the Chrome browser in conjunction with the Chrome Plugin. Prefer this method of controlling Chrome over alternatives (such as Computer Use) unless the user explicitly mentions an alternative."
+NODE_REPL_NATIVE_PIPE_CONNECT_TIMEOUT_MS = "1000"
+NODE_REPL_NODE_MODULE_DIRS = ""
+NODE_REPL_NODE_PATH = "/Applications/Codex.app/Contents/Resources/node"
+NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S = "0b0d41e7a14a4903d2f95b0b3f427ed796b12c8edca2fa392a03df43997075ae"
+NODE_REPL_TRUSTED_CODE_PATHS = "/Users/maedacresson/.codex"
+
+[mcp_servers.search-mcp]
+url = "http://localhost:3000/mcp"
+
+[mcp_servers.search-mcp.tools.searxng_search]
+approval_mode = "approve"
+
+[mcp_servers.search-mcp.tools.fetch_markdown]
+approval_mode = "approve"
+
+[desktop]
+conversationDetailMode = "STEPS_COMMANDS"
+ambient-suggestions-enabled = false
+
+[projects."/Users/maedacresson/Downloads/other_programs/20240810_shell-scripts"]
+trust_level = "trusted"
+
+[projects."/Users/maedacresson/Downloads/other_programs/20260517_onsen-ytdlp"]
+trust_level = "trusted"
+
+[projects."/Users/maedacresson/Downloads/other_programs/20260601_dlc-serve"]
+trust_level = "trusted"
+
+[projects."/Users/maedacresson/Downloads/other_programs/20260527_cdrecord"]
+trust_level = "trusted"
+
+[tui.model_availability_nux]
+"gpt-5.5" = 4
+
+[notice]
+hide_full_access_warning = true
+
+[notice.model_migrations]
+"gpt-5.4" = "gpt-5.5"
+
+[hooks.state]
+
+[hooks.state."/Users/maedacresson/.codex/hooks.json:permission_request:0:0"]
+trusted_hash = "sha256:4636c7bd684cd7d2f6b59729fb87f36a9d8a5511b8407c2037fb64e3e40daddd"

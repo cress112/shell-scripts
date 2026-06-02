@@ -1,0 +1,4 @@
+interface:
+  display_name: "Save"
+  short_description: "Save work history to HOME memory"
+  default_prompt: "Use $save to resolve the target project path, derive <project-id> by replacing every slash in the absolute path with '-', write the task history into ~/.codex/memories/projects/<project-id>/, save the detailed note there, and update MEMORY.md as the canonical index so another agent can resume it."
