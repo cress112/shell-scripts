@@ -1,4 +1,4 @@
 interface:
   display_name: "Save"
-  short_description: "Save work history to HOME memory"
-  default_prompt: "Use $save to resolve the target project path, derive <project-id> by replacing every slash in the absolute path with '-', write the task history into ~/.codex/memories/projects/<project-id>/, save the detailed note there, and update MEMORY.md as the canonical index so another agent can resume it."
+  short_description: "Save work history to SQLite memory"
+  default_prompt: "Use $save to resolve the target project path and save compact memory with ~/.codex/scripts/codex-memory add into ~/.codex/sqlite/user-memory.sqlite. Set status/permanence metadata so optimize-memory can delete completed ephemeral entries and preserve permanent decisions. Do not create or update Markdown memory files."

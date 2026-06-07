@@ -1,0 +1,674 @@
+#!/usr/bin/env python3
+"""Project-scoped SQLite memory CLI for Codex skills."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import sqlite3
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+
+SCHEMA_VERSION = 2
+DEFAULT_DB = Path.home() / ".codex" / "sqlite" / "user-memory.sqlite"
+PERMANENT_KINDS = {"decision", "principle", "project_goal", "user_preference", "constraint", "context", "open_item"}
+EPHEMERAL_KINDS = {"task", "verification", "raw_memory", "raw_import", "rollout_summary"}
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def project_key(project_path: str) -> str:
+    path = str(Path(project_path).expanduser().resolve())
+    return hashlib.sha256(path.encode("utf-8")).hexdigest()[:24]
+
+
+def connect(db_path: Path) -> sqlite3.Connection:
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(db_path))
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA busy_timeout = 5000")
+    return conn
+
+
+def current_schema_version(conn: sqlite3.Connection) -> int:
+    row = conn.execute("SELECT value FROM schema_meta WHERE key = 'schema_version'").fetchone()
+    if not row:
+        return 0
+    try:
+        return int(row["value"])
+    except (TypeError, ValueError):
+        return 0
+
+
+def init_db(conn: sqlite3.Connection) -> None:
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS schema_meta (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS projects (
+            id TEXT PRIMARY KEY,
+            path TEXT NOT NULL UNIQUE,
+            display_name TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS entries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            kind TEXT NOT NULL,
+            title TEXT NOT NULL,
+            body TEXT NOT NULL,
+            source_type TEXT,
+            source_path TEXT,
+            source_ref TEXT,
+            metadata_json TEXT NOT NULL DEFAULT '{}',
+            importance INTEGER NOT NULL DEFAULT 50,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            imported_at TEXT,
+            superseded_by INTEGER REFERENCES entries(id),
+            status TEXT NOT NULL DEFAULT 'active',
+            permanence TEXT NOT NULL DEFAULT 'normal',
+            pinned INTEGER NOT NULL DEFAULT 0,
+            archived_at TEXT,
+            completed_at TEXT,
+            last_accessed_at TEXT,
+            access_count INTEGER NOT NULL DEFAULT 0,
+            UNIQUE(project_id, source_path)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_entries_project_kind_updated
+            ON entries(project_id, kind, updated_at DESC);
+
+        CREATE INDEX IF NOT EXISTS idx_entries_source
+            ON entries(source_type, source_path);
+
+        CREATE TABLE IF NOT EXISTS commands (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            entry_id INTEGER NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
+            command TEXT NOT NULL,
+            cwd TEXT,
+            outcome TEXT,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS artifacts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            entry_id INTEGER NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
+            path TEXT NOT NULL,
+            role TEXT,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE VIRTUAL TABLE IF NOT EXISTS entry_fts USING fts5(
+            title,
+            body,
+            content='entries',
+            content_rowid='id'
+        );
+
+        CREATE TRIGGER IF NOT EXISTS entries_ai AFTER INSERT ON entries BEGIN
+            INSERT INTO entry_fts(rowid, title, body)
+            VALUES (new.id, new.title, new.body);
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS entries_ad AFTER DELETE ON entries BEGIN
+            INSERT INTO entry_fts(entry_fts, rowid, title, body)
+            VALUES('delete', old.id, old.title, old.body);
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS entries_au AFTER UPDATE ON entries BEGIN
+            INSERT INTO entry_fts(entry_fts, rowid, title, body)
+            VALUES('delete', old.id, old.title, old.body);
+            INSERT INTO entry_fts(rowid, title, body)
+            VALUES (new.id, new.title, new.body);
+        END;
+        """
+    )
+    previous_schema_version = current_schema_version(conn)
+    ensure_column(conn, "entries", "status", "TEXT NOT NULL DEFAULT 'active'")
+    ensure_column(conn, "entries", "permanence", "TEXT NOT NULL DEFAULT 'normal'")
+    ensure_column(conn, "entries", "pinned", "INTEGER NOT NULL DEFAULT 0")
+    ensure_column(conn, "entries", "archived_at", "TEXT")
+    ensure_column(conn, "entries", "completed_at", "TEXT")
+    ensure_column(conn, "entries", "last_accessed_at", "TEXT")
+    ensure_column(conn, "entries", "access_count", "INTEGER NOT NULL DEFAULT 0")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_entries_project_active ON entries(project_id, archived_at, superseded_by, status, permanence)"
+    )
+    if previous_schema_version < 2:
+        backfill_lifecycle(conn)
+    conn.execute(
+        "INSERT OR REPLACE INTO schema_meta(key, value) VALUES ('schema_version', ?)",
+        (str(SCHEMA_VERSION),),
+    )
+    conn.commit()
+
+
+def ensure_column(conn: sqlite3.Connection, table: str, column: str, definition: str) -> None:
+    columns = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+    if column not in columns:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+
+
+def backfill_lifecycle(conn: sqlite3.Connection) -> None:
+    now = utc_now()
+    conn.execute(
+        """
+        UPDATE entries
+        SET permanence = 'permanent'
+        WHERE permanence = 'normal'
+          AND kind IN ('index', 'summary', 'extension_note', 'decision', 'principle', 'project_goal', 'user_preference', 'constraint', 'context', 'open_item')
+        """
+    )
+    conn.execute(
+        """
+        UPDATE entries
+        SET status = 'completed',
+            permanence = 'ephemeral',
+            completed_at = COALESCE(completed_at, ?)
+        WHERE status = 'active'
+          AND permanence = 'normal'
+          AND kind IN ('raw_memory', 'raw_import', 'rollout_summary')
+        """,
+        (now,),
+    )
+
+
+def ensure_project(conn: sqlite3.Connection, project_path: str) -> sqlite3.Row:
+    resolved = str(Path(project_path).expanduser().resolve())
+    pid = project_key(resolved)
+    now = utc_now()
+    conn.execute(
+        """
+        INSERT INTO projects(id, path, display_name, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(path) DO UPDATE SET
+            display_name = excluded.display_name,
+            updated_at = excluded.updated_at
+        """,
+        (pid, resolved, Path(resolved).name, now, now),
+    )
+    return conn.execute("SELECT * FROM projects WHERE id = ?", (pid,)).fetchone()
+
+
+def first_heading(text: str, fallback: str) -> str:
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            title = stripped.lstrip("#").strip()
+            if title:
+                return title[:200]
+    return fallback[:200]
+
+
+def infer_kind(path: Path) -> str:
+    parts = set(path.parts)
+    name = path.name.lower()
+    if "rollout_summaries" in parts:
+        return "rollout_summary"
+    if "extensions" in parts:
+        return "extension_note"
+    if name == "memory.md":
+        return "index"
+    if name == "memory_summary.md":
+        return "summary"
+    if name == "raw_memories.md":
+        return "raw_memory"
+    return "note"
+
+
+def print_json(value: object) -> None:
+    print(json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True))
+
+
+def row_to_entry(row: sqlite3.Row, include_body: bool = False) -> dict[str, object]:
+    result: dict[str, object] = {
+        "id": row["id"],
+        "kind": row["kind"],
+        "title": row["title"],
+        "source_path": row["source_path"],
+        "importance": row["importance"],
+        "status": row["status"],
+        "permanence": row["permanence"],
+        "pinned": bool(row["pinned"]),
+        "archived_at": row["archived_at"],
+        "updated_at": row["updated_at"],
+    }
+    if "rank" in row.keys():
+        result["rank"] = row["rank"]
+    if "snippet" in row.keys():
+        result["snippet"] = row["snippet"]
+    if include_body:
+        result["body"] = row["body"]
+    return result
+
+
+def normalize_fts_query(query: str) -> str:
+    tokens = re.findall(r"[\w]+", query, flags=re.UNICODE)
+    if not tokens:
+        raise ValueError("search query must contain at least one searchable token")
+    return " AND ".join(f'"{token}"' for token in tokens)
+
+
+def metadata_contains_flag(metadata_json: str, key: str) -> bool:
+    try:
+        metadata = json.loads(metadata_json or "{}")
+    except json.JSONDecodeError:
+        return False
+    return bool(metadata.get(key))
+
+
+def default_permanence(kind: str) -> str:
+    if kind in PERMANENT_KINDS:
+        return "permanent"
+    if kind in EPHEMERAL_KINDS:
+        return "ephemeral"
+    return "normal"
+
+
+def default_status(kind: str) -> str:
+    if kind == "open_item":
+        return "active"
+    return "active"
+
+
+def cmd_init(args: argparse.Namespace) -> int:
+    with connect(args.db) as conn:
+        init_db(conn)
+    print_json({"db": str(args.db), "schema_version": SCHEMA_VERSION})
+    return 0
+
+
+def cmd_add(args: argparse.Namespace) -> int:
+    with connect(args.db) as conn:
+        init_db(conn)
+        project = ensure_project(conn, args.project)
+        now = utc_now()
+        metadata = json.loads(args.metadata_json) if args.metadata_json else {}
+        status = args.status or default_status(args.kind)
+        permanence = args.permanence or default_permanence(args.kind)
+        completed_at = now if status == "completed" else None
+        cur = conn.execute(
+            """
+            INSERT INTO entries(
+                project_id, kind, title, body, source_type, source_path,
+                source_ref, metadata_json, importance, created_at, updated_at,
+                status, permanence, pinned, completed_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                project["id"],
+                args.kind,
+                args.title,
+                args.body,
+                args.source_type,
+                args.source_path,
+                args.source_ref,
+                json.dumps(metadata, ensure_ascii=False, sort_keys=True),
+                args.importance,
+                now,
+                now,
+                status,
+                permanence,
+                1 if args.pinned else 0,
+                completed_at,
+            ),
+        )
+        conn.commit()
+        print_json({"id": cur.lastrowid, "project_id": project["id"]})
+    return 0
+
+
+def cmd_import_md(args: argparse.Namespace) -> int:
+    imported = []
+    skipped = []
+    with connect(args.db) as conn:
+        init_db(conn)
+        project = ensure_project(conn, args.project)
+        now = utc_now()
+        for raw_file in args.files:
+            path = Path(raw_file).expanduser().resolve()
+            if not path.exists():
+                skipped.append({"path": str(path), "reason": "missing"})
+                continue
+            text = path.read_text(encoding="utf-8")
+            rel_source = os.path.relpath(path, Path(args.project).expanduser().resolve())
+            title = first_heading(text, path.stem)
+            kind = args.kind or infer_kind(path)
+            metadata = {"imported_from": "markdown", "bytes": len(text.encode("utf-8"))}
+            status = "completed" if kind in {"raw_memory", "rollout_summary"} else "active"
+            permanence = "permanent" if kind in {"index", "summary", "extension_note"} else default_permanence(kind)
+            completed_at = now if status == "completed" else None
+            conn.execute(
+                """
+                INSERT INTO entries(
+                    project_id, kind, title, body, source_type, source_path,
+                    source_ref, metadata_json, importance, created_at, updated_at,
+                    imported_at, status, permanence, completed_at
+                )
+                VALUES (?, ?, ?, ?, 'markdown', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(project_id, source_path) DO UPDATE SET
+                    kind = excluded.kind,
+                    title = excluded.title,
+                    body = excluded.body,
+                    metadata_json = excluded.metadata_json,
+                    importance = excluded.importance,
+                    updated_at = excluded.updated_at,
+                    imported_at = excluded.imported_at,
+                    status = excluded.status,
+                    permanence = excluded.permanence,
+                    completed_at = excluded.completed_at
+                """,
+                (
+                    project["id"],
+                    kind,
+                    title,
+                    text,
+                    rel_source,
+                    str(path),
+                    json.dumps(metadata, ensure_ascii=False, sort_keys=True),
+                    args.importance,
+                    now,
+                    now,
+                    now,
+                    status,
+                    permanence,
+                    completed_at,
+                ),
+            )
+            imported.append({"path": rel_source, "kind": kind, "title": title})
+        conn.commit()
+    print_json({"db": str(args.db), "imported": imported, "skipped": skipped})
+    return 0
+
+
+def cmd_search(args: argparse.Namespace) -> int:
+    with connect(args.db) as conn:
+        init_db(conn)
+        project = ensure_project(conn, args.project)
+        params: list[object] = [project["id"], normalize_fts_query(args.query)]
+        kind_filter = ""
+        if args.kind:
+            kind_filter = "AND e.kind = ?"
+            params.append(args.kind)
+        params.append(args.limit)
+        rows = conn.execute(
+            f"""
+            SELECT
+                e.*,
+                bm25(entry_fts) AS rank,
+                snippet(entry_fts, 1, '[', ']', '...', 24) AS snippet
+            FROM entry_fts
+            JOIN entries e ON e.id = entry_fts.rowid
+            WHERE e.project_id = ?
+              AND entry_fts MATCH ?
+              AND e.archived_at IS NULL
+              AND e.superseded_by IS NULL
+              {kind_filter}
+            ORDER BY rank ASC, e.importance DESC, e.updated_at DESC
+            LIMIT ?
+            """,
+            params,
+        ).fetchall()
+    print_json({"project_id": project["id"], "results": [row_to_entry(r, args.include_body) for r in rows]})
+    return 0
+
+
+def cmd_recent(args: argparse.Namespace) -> int:
+    with connect(args.db) as conn:
+        init_db(conn)
+        project = ensure_project(conn, args.project)
+        params: list[object] = [project["id"]]
+        kind_filter = ""
+        if args.kind:
+            kind_filter = "AND kind = ?"
+            params.append(args.kind)
+        params.append(args.limit)
+        rows = conn.execute(
+            f"""
+            SELECT *
+            FROM entries
+            WHERE project_id = ?
+              AND archived_at IS NULL
+              AND superseded_by IS NULL
+              {kind_filter}
+            ORDER BY importance DESC, updated_at DESC
+            LIMIT ?
+            """,
+            params,
+        ).fetchall()
+    print_json({"project_id": project["id"], "results": [row_to_entry(r, args.include_body) for r in rows]})
+    return 0
+
+
+def cmd_context(args: argparse.Namespace) -> int:
+    with connect(args.db) as conn:
+        init_db(conn)
+        project = ensure_project(conn, args.project)
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM entries
+            WHERE project_id = ?
+              AND archived_at IS NULL
+              AND superseded_by IS NULL
+              AND NOT (status = 'completed' AND permanence = 'ephemeral')
+            ORDER BY
+                CASE kind
+                    WHEN 'project_goal' THEN 0
+                    WHEN 'principle' THEN 1
+                    WHEN 'decision' THEN 2
+                    WHEN 'constraint' THEN 3
+                    WHEN 'user_preference' THEN 4
+                    WHEN 'summary' THEN 0
+                    WHEN 'index' THEN 5
+                    WHEN 'extension_note' THEN 6
+                    WHEN 'open_item' THEN 7
+                    ELSE 4
+                END,
+                importance DESC,
+                updated_at DESC
+            LIMIT ?
+            """,
+            (project["id"], args.limit),
+        ).fetchall()
+    print_json({"project_id": project["id"], "results": [row_to_entry(r, args.include_body) for r in rows]})
+    return 0
+
+
+def cmd_stats(args: argparse.Namespace) -> int:
+    with connect(args.db) as conn:
+        init_db(conn)
+        project_rows = conn.execute(
+            "SELECT p.id, p.path, count(e.id) AS entries FROM projects p LEFT JOIN entries e ON e.project_id = p.id GROUP BY p.id ORDER BY p.path"
+        ).fetchall()
+        kind_rows = conn.execute(
+            "SELECT kind, count(*) AS count FROM entries GROUP BY kind ORDER BY kind"
+        ).fetchall()
+        lifecycle_rows = conn.execute(
+            """
+            SELECT
+                status,
+                permanence,
+                CASE WHEN archived_at IS NULL THEN 0 ELSE 1 END AS archived,
+                count(*) AS count
+            FROM entries
+            GROUP BY status, permanence, archived
+            ORDER BY status, permanence, archived
+            """
+        ).fetchall()
+    print_json(
+        {
+            "db": str(args.db),
+            "projects": [dict(r) for r in project_rows],
+            "kinds": [dict(r) for r in kind_rows],
+            "lifecycle": [dict(r) for r in lifecycle_rows],
+        }
+    )
+    return 0
+
+
+def cmd_optimize(args: argparse.Namespace) -> int:
+    with connect(args.db) as conn:
+        init_db(conn)
+        project = ensure_project(conn, args.project)
+        now = utc_now()
+        permanent_kept = conn.execute(
+            """
+            SELECT count(*) FROM entries
+            WHERE project_id = ?
+              AND archived_at IS NULL
+              AND (permanence = 'permanent' OR kind IN ('decision', 'principle', 'project_goal', 'user_preference', 'constraint', 'context', 'open_item') OR pinned = 1)
+            """,
+            (project["id"],),
+        ).fetchone()[0]
+        active_kept = conn.execute(
+            """
+            SELECT count(*) FROM entries
+            WHERE project_id = ?
+              AND archived_at IS NULL
+              AND status IN ('active', 'blocked')
+            """,
+            (project["id"],),
+        ).fetchone()[0]
+        delete_rows = conn.execute(
+            """
+            SELECT id, metadata_json FROM entries
+            WHERE project_id = ?
+              AND archived_at IS NULL
+              AND superseded_by IS NULL
+              AND status = 'completed'
+              AND permanence = 'ephemeral'
+              AND pinned = 0
+              AND kind IN ('task', 'verification', 'raw_memory', 'raw_import', 'rollout_summary')
+            """,
+            (project["id"],),
+        ).fetchall()
+        safe_delete_ids = [
+            row["id"]
+            for row in delete_rows
+            if not metadata_contains_flag(row["metadata_json"], "contains_permanent_facts")
+            and not metadata_contains_flag(row["metadata_json"], "has_open_items")
+        ]
+        skipped_for_flags = len(delete_rows) - len(safe_delete_ids)
+        archived = 0
+        deleted = 0
+        if args.apply and safe_delete_ids:
+            if args.delete:
+                conn.executemany("DELETE FROM entries WHERE id = ?", [(entry_id,) for entry_id in safe_delete_ids])
+                deleted = len(safe_delete_ids)
+            else:
+                conn.executemany(
+                    "UPDATE entries SET archived_at = ?, updated_at = ? WHERE id = ?",
+                    [(now, now, entry_id) for entry_id in safe_delete_ids],
+                )
+                archived = len(safe_delete_ids)
+            conn.commit()
+        result = {
+            "db": str(args.db),
+            "project_id": project["id"],
+            "mode": "apply" if args.apply else "dry-run",
+            "action": "delete" if args.delete else "archive",
+            "permanent_kept": permanent_kept,
+            "active_kept": active_kept,
+            "candidates": len(delete_rows),
+            "skipped_for_flags": skipped_for_flags,
+            "archived": archived,
+            "deleted": deleted,
+        }
+        print_json(result)
+    return 0
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--db", type=Path, default=DEFAULT_DB, help=f"SQLite DB path (default: {DEFAULT_DB})")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    init = sub.add_parser("init", help="Create or migrate the database schema")
+    init.set_defaults(func=cmd_init)
+
+    add = sub.add_parser("add", help="Add one structured memory entry")
+    add.add_argument("--project", required=True)
+    add.add_argument("--kind", required=True)
+    add.add_argument("--title", required=True)
+    add.add_argument("--body", required=True)
+    add.add_argument("--source-type")
+    add.add_argument("--source-path")
+    add.add_argument("--source-ref")
+    add.add_argument("--metadata-json")
+    add.add_argument("--importance", type=int, default=50)
+    add.add_argument("--status", choices=["active", "blocked", "completed"])
+    add.add_argument("--permanence", choices=["permanent", "normal", "ephemeral"])
+    add.add_argument("--pinned", action="store_true")
+    add.set_defaults(func=cmd_add)
+
+    imp = sub.add_parser("import-md", help="Import Markdown files as memory entries")
+    imp.add_argument("--project", required=True)
+    imp.add_argument("--kind")
+    imp.add_argument("--importance", type=int, default=50)
+    imp.add_argument("files", nargs="+")
+    imp.set_defaults(func=cmd_import_md)
+
+    search = sub.add_parser("search", help="Search project memory using SQLite FTS5")
+    search.add_argument("--project", required=True)
+    search.add_argument("--query", required=True)
+    search.add_argument("--kind")
+    search.add_argument("--limit", type=int, default=10)
+    search.add_argument("--include-body", action="store_true")
+    search.set_defaults(func=cmd_search)
+
+    recent = sub.add_parser("recent", help="Return recent or important entries")
+    recent.add_argument("--project", required=True)
+    recent.add_argument("--kind")
+    recent.add_argument("--limit", type=int, default=10)
+    recent.add_argument("--include-body", action="store_true")
+    recent.set_defaults(func=cmd_recent)
+
+    context = sub.add_parser("context", help="Return compact project context")
+    context.add_argument("--project", required=True)
+    context.add_argument("--limit", type=int, default=10)
+    context.add_argument("--include-body", action="store_true")
+    context.set_defaults(func=cmd_context)
+
+    optimize = sub.add_parser("optimize", help="Optimize project memory by archiving or deleting completed ephemeral entries")
+    optimize.add_argument("--project", required=True)
+    optimize.add_argument("--apply", action="store_true", help="Apply the optimization; omit for a count-only dry run")
+    optimize.add_argument("--delete", action="store_true", help="Physically delete safe completed ephemeral entries instead of archiving them")
+    optimize.set_defaults(func=cmd_optimize)
+
+    stats = sub.add_parser("stats", help="Show database statistics")
+    stats.set_defaults(func=cmd_stats)
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    try:
+        return args.func(args)
+    except sqlite3.OperationalError as exc:
+        print_json({"error": str(exc)})
+        return 2
+    except Exception as exc:
+        print_json({"error": str(exc)})
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

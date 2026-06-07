@@ -1,0 +1,4 @@
+interface:
+  display_name: "Optimize Memory"
+  short_description: "Delete completed ephemeral SQLite memory"
+  default_prompt: "Use $optimize-memory to resolve the target project path and run ~/.codex/scripts/codex-memory optimize --project <path> --apply --delete. Do not read or update Markdown memory files; report only compact counts."

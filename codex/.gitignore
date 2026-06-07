@@ -5,6 +5,8 @@ pets/
 plugins/
 sessions/
 shell_snapshots/
+vendor_imports/
+__pycache__/
 
 *sqlite*
 *tmp*

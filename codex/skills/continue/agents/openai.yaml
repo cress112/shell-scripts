@@ -1,4 +1,4 @@
 interface:
   display_name: "Continue"
-  short_description: "Resume work from HOME memory"
-  default_prompt: "Use $continue to resolve the target project path, derive <project-id> by replacing every slash in the absolute path with '-', map it to ~/.codex/memories/projects/<project-id>/, read that MEMORY.md as the canonical index, follow the linked memory files, explain the current state, and ask what to do next."
+  short_description: "Resume work from SQLite memory"
+  default_prompt: "Use $continue to resolve the target project path, query ~/.codex/sqlite/user-memory.sqlite through ~/.codex/scripts/codex-memory context/search, summarize the current state, and ask what to do next. Do not read Markdown memory files."
