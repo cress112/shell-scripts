@@ -159,5 +159,9 @@
     "trailing-spaces.trimOnSave": true,
     "window.zoomLevel": -1,
     "workbench.colorTheme": "Monokai Dimmed",
-    "explorer.compactFolders": false
+    "explorer.compactFolders": false,
+    "explorer.confirmPasteNative": false,
+    "json.schemaDownload.trustedDomains": {
+        "https://raw.githubusercontent.com/cress112/": true
+    }
 }
